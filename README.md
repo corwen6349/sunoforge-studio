@@ -33,7 +33,7 @@ SunoForge Studio 是一个专业的 AI 音乐制作辅助工具，专为 Suno AI
 *   **AI Engine**: 
     *   Google Gemini API (`@google/genai` SDK)
     *   DeepSeek API (REST)
-*   **Build**: 推荐使用 Vite (当前代码结构适配 ES Modules)
+*   **Build**: Vite
 
 ## 🚀 快速开始 (本地开发)
 
@@ -49,12 +49,10 @@ npm install
 
 ### 2. 安装依赖
 
-安装本项目所需的依赖包：
+安装项目依赖：
 
 ```bash
-npm install @google/genai lucide-react
-npm install -D tailwindcss postcss autoprefixer
-npx tailwindcss init -p
+npm install
 ```
 
 ### 3. 配置 Tailwind CSS
@@ -94,7 +92,7 @@ export default {
 
 ### 4. 设置环境变量
 
-在项目根目录创建 `.env` 文件，并填入你的 API Keys。本项目支持通过环境变量预配置 Key，方便容器化部署。
+在项目根目录创建 `.env` 文件，并填入你的 API Keys。
 
 ```env
 # Google Gemini API Key (必须)
@@ -104,9 +102,9 @@ VITE_API_KEY=your_google_gemini_api_key_here
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```
 
-*注意：在 Vite 环境下，代码中使用 `process.env.API_KEY` 或 `process.env.DEEPSEEK_API_KEY` 时，请确保你的打包工具（如 vite.config.ts 中的 `define`）能够正确注入这些变量。*
-
 ### 5. 运行项目
+
+启动开发服务器：
 
 ```bash
 npm run dev
@@ -123,6 +121,53 @@ npm run dev
     1.  **推荐**：用户可以在应用界面左下角的 **"设置" (Settings)** 页面中手动输入 Key。该 Key 仅存储在浏览器的 LocalStorage 中。
     2.  **部署时配置**：开发者可以通过环境变量 `DEEPSEEK_API_KEY` 预置 Key（适用于私有部署）。
 *   **获取 Key**：前往 [DeepSeek 开放平台](https://platform.deepseek.com/) 申请。
+
+## ☁️ 后端服务 (可选 - Cloudflare Workers + D1)
+
+为了启用用户注册、登录和历史记录云端同步功能，你需要部署配套的 Cloudflare Worker。
+
+### 1. 准备工作
+确保你已经安装了 [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) 并登录了 Cloudflare 账号。
+
+```bash
+npm install -g wrangler
+wrangler login
+```
+
+### 2. 初始化数据库
+在 Cloudflare Dashboard 中创建一个 D1 数据库，或者使用命令行：
+
+```bash
+wrangler d1 create sunoforge-db
+```
+
+复制输出中的 `database_id`，并更新 `worker/wrangler.toml` 文件中的 `database_id` 字段。
+
+### 3. 初始化表结构
+运行以下命令将 Schema 应用到远程数据库：
+
+```bash
+cd worker
+wrangler d1 execute sunoforge-db --remote --file=./schema.sql
+```
+
+### 4. 部署 Worker
+将后端服务部署到 Cloudflare Workers：
+
+```bash
+npm run deploy
+```
+
+部署成功后，你会获得一个 URL (例如 `https://sunoforge-worker.your-name.workers.dev`)。
+
+### 5. 连接前端
+修改 `services/api.ts` 文件，将 `API_BASE_URL` 更新为你部署的 Worker URL。
+
+```typescript
+const API_BASE_URL = 'https://sunoforge-worker.your-name.workers.dev';
+```
+
+现在，你的应用就拥有了完整的用户系统和云端存储功能！
 
 ## 📦 部署指南 (Vercel / Netlify)
 

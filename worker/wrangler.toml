@@ -1,0 +1,8 @@
+name = "sunoforge-worker"
+main = "src/index.ts"
+compatibility_date = "2024-02-08"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sunoforge-db"
+database_id = "f80f63a2-fff6-4403-b9b5-6e8986a19bf5" # User needs to replace this

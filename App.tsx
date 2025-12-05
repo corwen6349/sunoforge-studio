@@ -2,15 +2,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Layout, { ThemeMode } from './components/Layout';
 import SongResult from './components/SongResult';
+import Auth from './components/Auth';
+import Profile from './components/Profile';
+import HistoryView from './components/HistoryView';
 import { LIVE_MODIFIERS, EXAMPLE_PROMPTS, MUSIC_STYLES, AI_PROVIDERS, AI_MODELS } from './constants';
 import { generateSong, generateRandomTopic } from './services/gemini';
-import { GenerationState, SongGenerationResult, AIProvider } from './types';
-import { Wand2, Music, Sparkles, Loader2, Play, History, ArrowLeft, Info, Disc3, Mic2, User, Users, Settings as SettingsIcon, Moon, Sun, Monitor, ChevronDown, ChevronUp, Baby, Music2, Copy, FileAudio, Link, Upload, X, SlidersHorizontal, CheckCircle2, Dices, BrainCircuit, Key } from 'lucide-react';
+import { isApiConfigured, saveGenerationToCloud, getCurrentUser } from './services/api';
+import { GenerationState, SongGenerationResult, AIProvider, User } from './types';
+import { Wand2, Music, Sparkles, Loader2, Play, History, ArrowLeft, Info, Disc3, Mic2, Users, Settings as SettingsIcon, Moon, Sun, Monitor, ChevronDown, ChevronUp, Baby, Music2, Copy, FileAudio, Link, Upload, X, SlidersHorizontal, CheckCircle2, Dices, BrainCircuit, Key, LogIn, User as UserIcon } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 const App = () => {
   const [currentView, setCurrentView] = useState('studio');
   const [showResult, setShowResult] = useState(false);
+  
+  // User State
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
   
   // Tab State: 'create' or 'mimic'
   const [creationTab, setCreationTab] = useState<'create' | 'mimic'>('create');
@@ -52,6 +60,13 @@ const App = () => {
   const [deepseekKey, setDeepseekKey] = useState<string>('');
 
   // Initialize History, Theme, and AI Config
+  useEffect(() => {
+    // Check API auth state
+    if (isApiConfigured()) {
+      getCurrentUser().then(u => setUser(u));
+    }
+  }, []);
+
   useEffect(() => {
     const savedHistory = localStorage.getItem('suno_forge_history');
     if (savedHistory) {
@@ -233,6 +248,16 @@ const App = () => {
       
       setGenerationState({ isLoading: false, result, error: null });
       setHistory(prev => [result, ...prev]);
+      
+      // Save to cloud if user is logged in
+      if (user && isApiConfigured()) {
+        try {
+          await saveGenerationToCloud(user.id, result);
+        } catch (err) {
+          console.error('Failed to save to cloud:', err);
+        }
+      }
+      
       setShowResult(true); 
     } catch (err: any) {
       setGenerationState({ 
@@ -266,6 +291,9 @@ const App = () => {
     if (view === 'studio') {
       setShowResult(false);
     }
+    if (view === 'profile' && !user && isApiConfigured()) {
+      setShowAuth(true);
+    }
   };
 
   const loadFromHistory = (result: SongGenerationResult) => {
@@ -279,12 +307,27 @@ const App = () => {
     setShowResult(true);
   };
 
+  const handleDeleteLocal = (id: string) => {
+    setHistory(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleAuthSuccess = async () => {
+    setShowAuth(false);
+    const u = await getCurrentUser();
+    setUser(u);
+  };
+
+  const handleSignOut = () => {
+    setUser(null);
+    setCurrentView('studio');
+  };
+
   const voiceOptions = [
     { id: 'auto', label: '自动 (Auto)', icon: Users, color: 'text-gray-500' },
-    { id: 'male', label: '男声 (Male)', icon: User, color: 'text-blue-600' },
-    { id: 'female', label: '女声 (Female)', icon: User, color: 'text-pink-600' },
+    { id: 'male', label: '男声 (Male)', icon: UserIcon, color: 'text-blue-600' },
+    { id: 'female', label: '女声 (Female)', icon: UserIcon, color: 'text-pink-600' },
     { id: 'child', label: '童声 (Child)', icon: Baby, color: 'text-green-600' },
-    { id: 'elderly', label: '老年 (Elderly)', icon: User, color: 'text-amber-700' },
+    { id: 'elderly', label: '老年 (Elderly)', icon: UserIcon, color: 'text-amber-700' },
     { id: 'androgynous', label: '中性 (Neutral)', icon: Users, color: 'text-purple-600' },
   ] as const;
 
@@ -781,67 +824,13 @@ const App = () => {
   };
 
   const renderHistory = () => (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex items-center gap-4">
-         <button onClick={() => setCurrentView('studio')} className="md:hidden p-2 rounded-lg bg-white dark:bg-suno-800 text-gray-500 dark:text-gray-400">
-           <ArrowLeft size={20} />
-         </button>
-         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">历史记录</h1>
-      </div>
-      
-      {history.length === 0 ? (
-        <div className="text-center py-20 bg-white dark:bg-suno-800/30 rounded-2xl border border-dashed border-gray-300 dark:border-suno-700">
-          <History size={48} className="mx-auto text-gray-400 dark:text-gray-600 mb-4" />
-          <p className="text-gray-500 dark:text-gray-400 text-lg">暂无创作记录</p>
-          <button 
-            onClick={() => setCurrentView('studio')}
-            className="mt-4 text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium"
-          >
-            去创作第一首歌 →
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {history.map((item, idx) => (
-            <div key={item.id || idx} className="bg-white dark:bg-suno-800 rounded-xl border border-gray-200 dark:border-suno-700 p-4 hover:border-indigo-500 transition-all group shadow-sm hover:shadow-md">
-              <div className="flex gap-4">
-                <div className="w-20 h-20 rounded-lg bg-gray-100 dark:bg-gray-900 overflow-hidden flex-shrink-0 relative">
-                   <img 
-                    src={`https://picsum.photos/seed/${encodeURIComponent(item.title + (item.albumTitle || ''))}/200/200`} 
-                    alt={item.title} 
-                    className="w-full h-full object-cover opacity-90 dark:opacity-70 group-hover:opacity-100 transition-opacity"
-                  />
-                  {item.type === 'album' && (
-                     <div className="absolute top-1 left-1 bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded shadow">
-                        ALBUM
-                     </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-gray-900 dark:text-white font-bold truncate">
-                    {item.albumTitle ? `${item.albumTitle}` : item.title}
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                    {item.type === 'album' ? `主打歌: ${item.title}` : item.stylePrompt}
-                  </p>
-                  <div className="mt-3 flex items-center justify-between">
-                     <span className="text-xs text-gray-400 dark:text-gray-600 font-mono">
-                       {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Unknown Date'}
-                     </span>
-                     <button 
-                      onClick={() => loadFromHistory(item)}
-                      className="text-xs bg-indigo-50 dark:bg-indigo-600/20 hover:bg-indigo-100 dark:hover:bg-indigo-600 text-indigo-600 dark:text-indigo-300 dark:hover:text-white px-3 py-1.5 rounded-full transition-colors"
-                     >
-                       查看详情
-                     </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <HistoryView 
+      user={user}
+      localHistory={history}
+      onLoadFromHistory={loadFromHistory}
+      onBackToStudio={() => setCurrentView('studio')}
+      onDeleteLocal={handleDeleteLocal}
+    />
   );
 
   const renderSettings = () => (
@@ -985,12 +974,28 @@ const App = () => {
   );
 
   return (
-    <Layout currentView={currentView} onViewChange={handleViewChange} theme={theme} onThemeChange={setTheme}>
-      {currentView === 'studio' && renderStudio()}
-      {currentView === 'history' && renderHistory()}
-      {currentView === 'profile' && renderPlaceholder('个人资料')}
-      {currentView === 'settings' && renderSettings()}
-    </Layout>
+    <>
+      <Layout 
+        currentView={currentView} 
+        onViewChange={handleViewChange} 
+        theme={theme} 
+        onThemeChange={setTheme}
+        user={user}
+        onShowAuth={() => setShowAuth(true)}
+      >
+        {currentView === 'studio' && renderStudio()}
+        {currentView === 'history' && renderHistory()}
+        {currentView === 'profile' && <Profile user={user} onSignOut={handleSignOut} />}
+        {currentView === 'settings' && renderSettings()}
+      </Layout>
+      
+      {showAuth && (
+        <Auth 
+          onSuccess={handleAuthSuccess} 
+          onClose={() => setShowAuth(false)}
+        />
+      )}
+    </>
   );
 };
 

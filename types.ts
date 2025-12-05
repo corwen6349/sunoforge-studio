@@ -57,3 +57,25 @@ export interface AIModel {
   name: string;
   provider: AIProvider;
 }
+
+// User Profile Types
+export interface User {
+  id: string;
+  email: string;
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+}
+
+export interface UserProfile extends User {
+  created_at: string;
+  updated_at?: string;
+}
+
+// User Statistics
+export interface UserStats {
+  totalGenerations: number;
+  singleCount: number;
+  albumCount: number;
+  joinDate: number;
+}
